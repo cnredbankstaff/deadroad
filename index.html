@@ -1,0 +1,1583 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dead Road: Survival Drive</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rubik:wght@400;600;700&display=swap');
+    
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    
+    .game-title { font-family: 'Bangers', cursive; letter-spacing: 2px; }
+    .game-ui { font-family: 'Rubik', sans-serif; }
+    
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+    
+    .inventory-slot {
+      background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+      border: 2px solid #444;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    
+    .inventory-slot:hover {
+      border-color: #f59e0b;
+      transform: scale(1.05);
+    }
+    
+    .btn-game {
+      background: linear-gradient(145deg, #ef4444, #b91c1c);
+      border: 3px solid #7f1d1d;
+      box-shadow: 0 4px 0 #7f1d1d, 0 6px 10px rgba(0,0,0,0.3);
+      transition: all 0.1s;
+    }
+    
+    .btn-game:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #7f1d1d, 0 8px 12px rgba(0,0,0,0.3);
+    }
+    
+    .btn-game:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #7f1d1d, 0 4px 8px rgba(0,0,0,0.3);
+    }
+    
+    .stat-bar {
+      background: linear-gradient(to bottom, #1a1a1a, #0a0a0a);
+      border: 2px solid #333;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .stat-fill {
+      transition: width 0.3s ease;
+    }
+    
+    .loot-popup {
+      animation: popIn 0.3s ease;
+    }
+    
+    @keyframes popIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    
+    .shake { animation: shake 0.3s ease; }
+    
+    .zombie-warning {
+      animation: pulse 0.5s ease infinite alternate;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-gray-900 game-ui overflow-hidden">
+  <div id="app" class="h-full w-full relative"><!-- Main Menu -->
+   <div id="mainMenu" class="absolute inset-0 flex flex-col items-center justify-center z-50" style="background: linear-gradient(to bottom, #1a0a0a, #2d1810, #1a0a0a);">
+    <div class="absolute inset-0 opacity-20" style="background-image: url('data:image/svg+xml,%3Csvg width=\" 60\ height="\&quot;60\&quot;" viewbox="\&quot;0" 0 60 xmlns="\&quot;http://www.w3.org/2000/svg\&quot;%3E%3Cpath" d="\&quot;M30" 0l60 30l30 60l0 30z\ fill="\&quot;%23000\&quot;" fill-opacity="\&quot;0.3\&quot;/%3E%3C/svg%3E');&quot;"></div>
+    <div class="relative z-10 text-center">
+     <h1 id="titleText" class="game-title text-6xl md:text-8xl text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)] mb-2">DEAD ROAD</h1>
+     <p class="text-2xl md:text-3xl text-amber-400 font-bold mb-8">SURVIVAL DRIVE</p>
+     <div class="flex flex-col gap-4 items-center"><button id="newGameBtn" class="btn-game px-12 py-4 text-white text-xl font-bold rounded-lg"> 🚗 NEW GAME </button> <button id="continueBtn" class="btn-game px-12 py-4 text-white text-xl font-bold rounded-lg hidden"> ▶️ CONTINUE </button> <button id="controlsBtn" class="bg-gray-700 hover:bg-gray-600 px-8 py-3 text-white font-bold rounded-lg border-2 border-gray-500"> 🎮 CONTROLS </button>
+     </div>
+     <div class="mt-8 text-gray-400 text-sm">
+      <p>🏆 Highest Distance: <span id="menuHighScore" class="text-amber-400 font-bold">0m</span></p>
+     </div>
+    </div><!-- Decorative zombies -->
+    <div class="absolute bottom-0 left-0 right-0 h-32 opacity-30" style="background: linear-gradient(to top, #000, transparent);"></div>
+   </div><!-- Controls Modal -->
+   <div id="controlsModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-60 hidden">
+    <div class="bg-gray-800 rounded-xl p-8 max-w-md border-4 border-amber-500">
+     <h2 class="game-title text-3xl text-amber-400 mb-6 text-center">CONTROLS</h2>
+     <div class="space-y-3 text-white">
+      <div class="flex justify-between items-center bg-gray-700 p-3 rounded"><span class="font-bold">W / ↑</span> <span class="text-gray-300">Accelerate</span>
+      </div>
+      <div class="flex justify-between items-center bg-gray-700 p-3 rounded"><span class="font-bold">S / ↓</span> <span class="text-gray-300">Brake / Reverse</span>
+      </div>
+      <div class="flex justify-between items-center bg-gray-700 p-3 rounded"><span class="font-bold">A / D</span> <span class="text-gray-300">Balance in Air</span>
+      </div>
+      <div class="flex justify-between items-center bg-gray-700 p-3 rounded"><span class="font-bold">E</span> <span class="text-gray-300">Exit Truck</span>
+      </div>
+      <div class="flex justify-between items-center bg-gray-700 p-3 rounded"><span class="font-bold">F</span> <span class="text-gray-300">Interact / Loot</span>
+      </div>
+     </div><button id="closeControls" class="w-full mt-6 bg-red-600 hover:bg-red-500 py-3 text-white font-bold rounded-lg"> CLOSE </button>
+    </div>
+   </div><!-- Game Canvas -->
+   <canvas id="gameCanvas" class="absolute inset-0"></canvas><!-- Game UI Overlay -->
+   <div id="gameUI" class="absolute inset-0 pointer-events-none hidden"><!-- Top HUD -->
+    <div class="absolute top-0 left-0 right-0 p-3 pointer-events-auto">
+     <div class="flex justify-between items-start gap-4 flex-wrap"><!-- Left Stats -->
+      <div class="bg-black/70 rounded-lg p-3 backdrop-blur-sm">
+       <div class="flex items-center gap-4"><!-- Fuel -->
+        <div class="w-32">
+         <div class="flex items-center gap-1 mb-1"><span class="text-amber-400">⛽</span> <span class="text-white text-xs font-bold">FUEL</span>
+         </div>
+         <div class="stat-bar h-4">
+          <div id="fuelBar" class="stat-fill h-full bg-gradient-to-r from-amber-600 to-amber-400" style="width: 100%;"></div>
+         </div>
+        </div><!-- Truck Health -->
+        <div class="w-32">
+         <div class="flex items-center gap-1 mb-1"><span class="text-green-400">🚗</span> <span class="text-white text-xs font-bold">TRUCK</span>
+         </div>
+         <div class="stat-bar h-4">
+          <div id="truckHealthBar" class="stat-fill h-full bg-gradient-to-r from-green-600 to-green-400" style="width: 100%;"></div>
+         </div>
+        </div><!-- Player Health -->
+        <div class="w-32">
+         <div class="flex items-center gap-1 mb-1"><span class="text-red-400">❤️</span> <span class="text-white text-xs font-bold">HEALTH</span>
+         </div>
+         <div class="stat-bar h-4">
+          <div id="healthBar" class="stat-fill h-full bg-gradient-to-r from-red-600 to-red-400" style="width: 100%;"></div>
+         </div>
+        </div>
+       </div>
+      </div><!-- Right Stats -->
+      <div class="bg-black/70 rounded-lg p-3 backdrop-blur-sm">
+       <div class="flex items-center gap-4">
+        <div class="text-center">
+         <div class="text-xs text-gray-400">
+          DISTANCE
+         </div>
+         <div id="distanceDisplay" class="text-xl font-bold text-white">
+          0m
+         </div>
+        </div>
+        <div class="text-center">
+         <div class="text-xs text-gray-400">
+          COINS
+         </div>
+         <div id="coinsDisplay" class="text-xl font-bold text-amber-400">
+          0
+         </div>
+        </div><button id="pauseBtn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded pointer-events-auto"> <i data-lucide="pause" class="w-5 h-5 text-white"></i> </button>
+       </div>
+      </div>
+     </div>
+    </div><!-- Inventory Quick Bar -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto">
+     <div class="bg-black/70 rounded-lg p-2 backdrop-blur-sm">
+      <div class="flex items-center gap-2">
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">⛽</span> <span id="gasCount" class="text-xs text-white font-bold">0</span>
+       </div>
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">🍖</span> <span id="foodCount" class="text-xs text-white font-bold">0</span>
+       </div>
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">🪵</span> <span id="woodCount" class="text-xs text-white font-bold">0</span>
+       </div>
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">🪨</span> <span id="stoneCount" class="text-xs text-white font-bold">0</span>
+       </div>
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">⚙️</span> <span id="metalCount" class="text-xs text-white font-bold">0</span>
+       </div>
+       <div class="inventory-slot w-12 h-12 flex flex-col items-center justify-center"><span class="text-lg">🔧</span> <span id="partsCount" class="text-xs text-white font-bold">0</span>
+       </div><button id="inventoryBtn" class="bg-amber-600 hover:bg-amber-500 p-2 rounded ml-2"> <i data-lucide="backpack" class="w-6 h-6 text-white"></i> </button>
+      </div>
+     </div>
+    </div><!-- Mobile Controls -->
+    <div class="absolute bottom-4 left-4 flex flex-col gap-2 pointer-events-auto md:hidden"><button id="mobileAccel" class="bg-green-600/80 w-16 h-16 rounded-full flex items-center justify-center text-2xl active:bg-green-500">⬆️</button> <button id="mobileBrake" class="bg-red-600/80 w-16 h-16 rounded-full flex items-center justify-center text-2xl active:bg-red-500">⬇️</button>
+    </div>
+    <div class="absolute bottom-4 right-4 flex flex-col gap-2 pointer-events-auto md:hidden">
+     <div class="flex gap-2"><button id="mobileLeft" class="bg-blue-600/80 w-12 h-12 rounded-full flex items-center justify-center text-xl active:bg-blue-500">⬅️</button> <button id="mobileRight" class="bg-blue-600/80 w-12 h-12 rounded-full flex items-center justify-center text-xl active:bg-blue-500">➡️</button>
+     </div>
+     <div class="flex gap-2"><button id="mobileExit" class="bg-purple-600/80 w-12 h-12 rounded-full flex items-center justify-center text-xl active:bg-purple-500">E</button> <button id="mobileInteract" class="bg-amber-600/80 w-12 h-12 rounded-full flex items-center justify-center text-xl active:bg-amber-500">F</button>
+     </div>
+    </div><!-- Interaction Prompt -->
+    <div id="interactPrompt" class="absolute top-1/3 left-1/2 -translate-x-1/2 hidden">
+     <div class="bg-black/80 px-6 py-3 rounded-lg border-2 border-amber-400">
+      <p class="text-amber-400 font-bold text-center">Press <span class="bg-amber-600 px-2 py-1 rounded text-white">F</span> to <span id="interactAction">loot</span></p>
+     </div>
+    </div><!-- Zombie Warning -->
+    <div id="zombieWarning" class="absolute top-1/4 left-1/2 -translate-x-1/2 hidden zombie-warning">
+     <div class="bg-red-900/90 px-8 py-4 rounded-lg border-4 border-red-500">
+      <p class="text-red-200 font-bold text-xl text-center">⚠️ ZOMBIES NEARBY! ⚠️</p>
+     </div>
+    </div>
+   </div><!-- Inventory Modal -->
+   <div id="inventoryModal" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-xl p-6 max-w-lg w-full mx-4 border-4 border-amber-500">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="game-title text-2xl text-amber-400">BACKPACK</h2><button id="closeInventory" class="text-gray-400 hover:text-white"> <i data-lucide="x" class="w-6 h-6"></i> </button>
+     </div>
+     <div class="grid grid-cols-4 gap-3 mb-4">
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">⛽</span>
+       <p class="text-xs text-gray-400 mt-1">Gas</p>
+       <p id="invGas" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">🍖</span>
+       <p class="text-xs text-gray-400 mt-1">Food</p>
+       <p id="invFood" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">🪵</span>
+       <p class="text-xs text-gray-400 mt-1">Wood</p>
+       <p id="invWood" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">🪨</span>
+       <p class="text-xs text-gray-400 mt-1">Stone</p>
+       <p id="invStone" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">⚙️</span>
+       <p class="text-xs text-gray-400 mt-1">Metal</p>
+       <p id="invMetal" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">🔧</span>
+       <p class="text-xs text-gray-400 mt-1">Parts</p>
+       <p id="invParts" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">💰</span>
+       <p class="text-xs text-gray-400 mt-1">Coins</p>
+       <p id="invCoins" class="text-white font-bold">0</p>
+      </div>
+      <div class="inventory-slot p-3 text-center"><span class="text-2xl">🎒</span>
+       <p class="text-xs text-gray-400 mt-1">Capacity</p>
+       <p id="invCapacity" class="text-white font-bold">Lv.1</p>
+      </div>
+     </div>
+     <div class="flex gap-2"><button id="useGasBtn" class="flex-1 bg-amber-600 hover:bg-amber-500 py-2 text-white font-bold rounded"> ⛽ Use Gas </button> <button id="useFoodBtn" class="flex-1 bg-green-600 hover:bg-green-500 py-2 text-white font-bold rounded"> 🍖 Eat Food </button> <button id="repairBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 text-white font-bold rounded"> 🔧 Repair </button>
+     </div>
+    </div>
+   </div><!-- Pause Menu -->
+   <div id="pauseMenu" class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-800 rounded-xl p-8 text-center border-4 border-amber-500">
+     <h2 class="game-title text-4xl text-amber-400 mb-6">PAUSED</h2>
+     <div class="flex flex-col gap-3"><button id="resumeBtn" class="bg-green-600 hover:bg-green-500 px-8 py-3 text-white font-bold rounded-lg"> ▶️ RESUME </button> <button id="saveBtn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 text-white font-bold rounded-lg"> 💾 SAVE GAME </button> <button id="quitBtn" class="bg-red-600 hover:bg-red-500 px-8 py-3 text-white font-bold rounded-lg"> 🚪 QUIT </button>
+     </div>
+    </div>
+   </div><!-- Game Over -->
+   <div id="gameOverScreen" class="absolute inset-0 bg-black/90 flex items-center justify-center z-50 hidden">
+    <div class="text-center">
+     <h2 class="game-title text-6xl text-red-500 mb-4">GAME OVER</h2>
+     <p id="deathReason" class="text-xl text-gray-400 mb-6">You didn't survive...</p>
+     <div class="bg-gray-800 rounded-lg p-6 mb-6">
+      <p class="text-gray-400">Distance Traveled</p>
+      <p id="finalDistance" class="text-4xl font-bold text-amber-400">0m</p>
+     </div>
+     <div class="flex gap-4 justify-center"><button id="retryBtn" class="btn-game px-8 py-3 text-white font-bold rounded-lg"> 🔄 RETRY </button> <button id="menuBtn" class="bg-gray-700 hover:bg-gray-600 px-8 py-3 text-white font-bold rounded-lg border-2 border-gray-500"> 🏠 MENU </button>
+     </div>
+    </div>
+   </div><!-- Loot Popup -->
+   <div id="lootPopup" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden loot-popup z-40">
+    <div class="bg-gray-800 rounded-xl p-6 border-4 border-green-500 text-center">
+     <h3 class="text-2xl font-bold text-green-400 mb-4">LOOT FOUND!</h3>
+     <div id="lootItems" class="flex flex-wrap gap-3 justify-center mb-4"><!-- Loot items will be added here -->
+     </div><button id="closeLoot" class="bg-green-600 hover:bg-green-500 px-6 py-2 text-white font-bold rounded"> COLLECT </button>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Default configuration
+    const defaultConfig = {
+      game_title: 'DEAD ROAD',
+      background_color: '#1a0a0a',
+      surface_color: '#2d1810',
+      text_color: '#ffffff',
+      primary_action: '#ef4444',
+      secondary_action: '#f59e0b'
+    };
+
+    let config = { ...defaultConfig };
+    let savedGames = [];
+
+    // Element SDK initialization
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (newConfig) => {
+          config = { ...defaultConfig, ...newConfig };
+          applyConfig();
+        },
+        mapToCapabilities: (cfg) => ({
+          recolorables: [
+            {
+              get: () => cfg.background_color || defaultConfig.background_color,
+              set: (v) => { cfg.background_color = v; window.elementSdk.setConfig({ background_color: v }); }
+            },
+            {
+              get: () => cfg.surface_color || defaultConfig.surface_color,
+              set: (v) => { cfg.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); }
+            },
+            {
+              get: () => cfg.text_color || defaultConfig.text_color,
+              set: (v) => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); }
+            },
+            {
+              get: () => cfg.primary_action || defaultConfig.primary_action,
+              set: (v) => { cfg.primary_action = v; window.elementSdk.setConfig({ primary_action: v }); }
+            },
+            {
+              get: () => cfg.secondary_action || defaultConfig.secondary_action,
+              set: (v) => { cfg.secondary_action = v; window.elementSdk.setConfig({ secondary_action: v }); }
+            }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (cfg) => new Map([
+          ['game_title', cfg.game_title || defaultConfig.game_title]
+        ])
+      });
+    }
+
+    function applyConfig() {
+      const title = config.game_title || defaultConfig.game_title;
+      const titleEl = document.getElementById('titleText');
+      if (titleEl) titleEl.textContent = title;
+    }
+
+    // Data SDK initialization
+    const dataHandler = {
+      onDataChanged(data) {
+        savedGames = data;
+        updateContinueButton();
+        updateHighScore();
+      }
+    };
+
+    if (window.dataSdk) {
+      window.dataSdk.init(dataHandler);
+    }
+
+    function updateContinueButton() {
+      const continueBtn = document.getElementById('continueBtn');
+      if (savedGames.length > 0) {
+        continueBtn.classList.remove('hidden');
+      } else {
+        continueBtn.classList.add('hidden');
+      }
+    }
+
+    function updateHighScore() {
+      const highScore = savedGames.reduce((max, save) => Math.max(max, save.highest_distance || 0), 0);
+      document.getElementById('menuHighScore').textContent = highScore + 'm';
+    }
+
+    // Game State
+    const game = {
+      running: false,
+      paused: false,
+      inTruck: true,
+      
+      // Player stats
+      fuel: 100,
+      health: 100,
+      truckHealth: 100,
+      distance: 0,
+      coins: 0,
+      highestDistance: 0,
+      
+      // Inventory
+      gasCans: 0,
+      food: 0,
+      wood: 0,
+      stone: 0,
+      metal: 0,
+      vehicleParts: 0,
+      backpackLevel: 1,
+      
+      // Physics
+      truckX: 200,
+      truckY: 300,
+      truckVelX: 0,
+      truckVelY: 0,
+      truckAngle: 0,
+      truckAngularVel: 0,
+      
+      // Player position (when outside truck)
+      playerX: 0,
+      playerY: 0,
+      playerVelX: 0,
+      playerVelY: 0,
+      playerFacing: 1,
+      
+      // World
+      cameraX: 0,
+      terrain: [],
+      locations: [],
+      lootables: [],
+      zombies: [],
+      
+      // Controls
+      keys: {},
+      
+      // Constants
+      gravity: 0.5,
+      maxSpeed: 8,
+      acceleration: 0.3,
+      brakeForce: 0.4,
+      airRotation: 0.03,
+      groundFriction: 0.98,
+      airFriction: 0.995,
+      fuelConsumption: 0.02,
+      
+      // Terrain generation
+      terrainSegmentWidth: 100,
+      lastTerrainX: 0
+    };
+
+    // Canvas setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Terrain generation
+    function generateTerrain(startX, endX) {
+      const segmentWidth = game.terrainSegmentWidth;
+      let x = Math.floor(startX / segmentWidth) * segmentWidth;
+      
+      while (x < endX) {
+        if (!game.terrain.find(t => t.x === x)) {
+          const prevTerrain = game.terrain.find(t => t.x === x - segmentWidth);
+          const prevY = prevTerrain ? prevTerrain.y : canvas.height * 0.6;
+          
+          // Generate varied terrain
+          let heightChange = (Math.random() - 0.5) * 60;
+          const distanceFactor = Math.max(0, x / 5000);
+          heightChange *= (1 + distanceFactor * 0.5);
+          
+          let newY = prevY + heightChange;
+          newY = Math.max(canvas.height * 0.3, Math.min(canvas.height * 0.8, newY));
+          
+          // Terrain features
+          let type = 'normal';
+          const rand = Math.random();
+          if (rand < 0.05) type = 'ramp';
+          else if (rand < 0.1) type = 'pit';
+          else if (rand < 0.15) type = 'debris';
+          
+          game.terrain.push({
+            x: x,
+            y: newY,
+            type: type,
+            width: segmentWidth
+          });
+          
+          // Generate locations and lootables
+          if (Math.random() < 0.08 && x > 500) {
+            generateLocation(x, newY);
+          }
+          
+          if (Math.random() < 0.15) {
+            generateLootable(x + Math.random() * segmentWidth, newY);
+          }
+          
+          // Generate zombies
+          if (Math.random() < 0.1 && x > 300) {
+            generateZombie(x + Math.random() * segmentWidth, newY);
+          }
+        }
+        x += segmentWidth;
+      }
+      
+      // Sort terrain by x position
+      game.terrain.sort((a, b) => a.x - b.x);
+      
+      // Clean up old terrain
+      game.terrain = game.terrain.filter(t => t.x > game.cameraX - 500);
+      game.lootables = game.lootables.filter(l => l.x > game.cameraX - 500);
+      game.locations = game.locations.filter(l => l.x > game.cameraX - 500);
+      game.zombies = game.zombies.filter(z => z.x > game.cameraX - 500);
+    }
+
+    function generateLocation(x, groundY) {
+      const types = ['gas_station', 'house', 'shop', 'military', 'repair_shop'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      
+      game.locations.push({
+        x: x,
+        y: groundY - 80,
+        type: type,
+        width: 120,
+        height: 80,
+        looted: false
+      });
+    }
+
+    function generateLootable(x, groundY) {
+      const types = ['gas_can', 'crate', 'barrel', 'chest'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      
+      game.lootables.push({
+        x: x,
+        y: groundY - 20,
+        type: type,
+        collected: false
+      });
+    }
+
+    function generateZombie(x, groundY) {
+      game.zombies.push({
+        x: x,
+        y: groundY - 30,
+        velX: 0,
+        health: 30,
+        state: 'idle',
+        animFrame: 0
+      });
+    }
+
+    // Get terrain height at position
+    function getTerrainHeight(x) {
+      const segment = game.terrain.find(t => x >= t.x && x < t.x + t.width);
+      if (!segment) return canvas.height * 0.6;
+      
+      const nextSegment = game.terrain.find(t => t.x === segment.x + segment.width);
+      if (!nextSegment) return segment.y;
+      
+      // Interpolate between segments
+      const t = (x - segment.x) / segment.width;
+      return segment.y + (nextSegment.y - segment.y) * t;
+    }
+
+    // Get terrain angle at position
+    function getTerrainAngle(x) {
+      const segment = game.terrain.find(t => x >= t.x && x < t.x + t.width);
+      if (!segment) return 0;
+      
+      const nextSegment = game.terrain.find(t => t.x === segment.x + segment.width);
+      if (!nextSegment) return 0;
+      
+      const dy = nextSegment.y - segment.y;
+      const dx = segment.width;
+      return Math.atan2(dy, dx);
+    }
+
+    // Physics update
+    function updatePhysics() {
+      if (game.inTruck) {
+        updateTruckPhysics();
+      } else {
+        updatePlayerPhysics();
+      }
+      
+      updateZombies();
+      
+      // Update camera
+      const targetX = game.inTruck ? game.truckX - canvas.width * 0.3 : game.playerX - canvas.width * 0.3;
+      game.cameraX += (targetX - game.cameraX) * 0.1;
+      game.cameraX = Math.max(0, game.cameraX);
+      
+      // Update distance
+      const currentX = game.inTruck ? game.truckX : game.playerX;
+      game.distance = Math.max(game.distance, Math.floor(currentX / 10));
+      game.highestDistance = Math.max(game.highestDistance, game.distance);
+      
+      // Generate terrain ahead
+      generateTerrain(game.cameraX - 200, game.cameraX + canvas.width + 500);
+    }
+
+    function updateTruckPhysics() {
+      const groundY = getTerrainHeight(game.truckX);
+      const groundAngle = getTerrainAngle(game.truckX);
+      const isGrounded = game.truckY >= groundY - 40;
+      
+      // Input handling
+      if (game.keys['KeyW'] || game.keys['ArrowUp']) {
+        if (game.fuel > 0) {
+          game.truckVelX += Math.cos(game.truckAngle) * game.acceleration;
+          game.fuel -= game.fuelConsumption;
+        }
+      }
+      
+      if (game.keys['KeyS'] || game.keys['ArrowDown']) {
+        game.truckVelX -= game.brakeForce;
+      }
+      
+      // Air rotation
+      if (!isGrounded) {
+        if (game.keys['KeyA'] || game.keys['ArrowLeft']) {
+          game.truckAngularVel -= game.airRotation;
+        }
+        if (game.keys['KeyD'] || game.keys['ArrowRight']) {
+          game.truckAngularVel += game.airRotation;
+        }
+      }
+      
+      // Apply gravity
+      game.truckVelY += game.gravity;
+      
+      // Apply friction
+      if (isGrounded) {
+        game.truckVelX *= game.groundFriction;
+        game.truckAngularVel *= 0.9;
+        
+        // Align to ground
+        const targetAngle = groundAngle;
+        game.truckAngle += (targetAngle - game.truckAngle) * 0.2;
+      } else {
+        game.truckVelX *= game.airFriction;
+        game.truckAngularVel *= 0.995;
+      }
+      
+      // Apply angular velocity
+      game.truckAngle += game.truckAngularVel;
+      
+      // Clamp speed
+      game.truckVelX = Math.max(-game.maxSpeed * 0.5, Math.min(game.maxSpeed, game.truckVelX));
+      
+      // Update position
+      game.truckX += game.truckVelX;
+      game.truckY += game.truckVelY;
+      
+      // Ground collision
+      if (game.truckY > groundY - 35) {
+        game.truckY = groundY - 35;
+        game.truckVelY = 0;
+        
+        // Impact damage
+        if (Math.abs(game.truckVelY) > 10) {
+          game.truckHealth -= Math.abs(game.truckVelY) * 2;
+        }
+      }
+      
+      // Flip detection
+      const normalizedAngle = ((game.truckAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      if (normalizedAngle > Math.PI * 0.6 && normalizedAngle < Math.PI * 1.4) {
+        game.truckHealth -= 0.5;
+      }
+      
+      // Boundary
+      game.truckX = Math.max(50, game.truckX);
+      
+      // Fuel/health checks
+      if (game.fuel <= 0 && game.gasCans <= 0) {
+        // Can still coast
+      }
+      
+      if (game.truckHealth <= 0) {
+        gameOver('Your truck was destroyed!');
+      }
+    }
+
+    function updatePlayerPhysics() {
+      const groundY = getTerrainHeight(game.playerX);
+      const isGrounded = game.playerY >= groundY - 30;
+      
+      // Movement
+      if (game.keys['KeyA'] || game.keys['ArrowLeft']) {
+        game.playerVelX = -3;
+        game.playerFacing = -1;
+      } else if (game.keys['KeyD'] || game.keys['ArrowRight']) {
+        game.playerVelX = 3;
+        game.playerFacing = 1;
+      } else {
+        game.playerVelX *= 0.8;
+      }
+      
+      // Gravity
+      game.playerVelY += game.gravity * 0.8;
+      
+      // Update position
+      game.playerX += game.playerVelX;
+      game.playerY += game.playerVelY;
+      
+      // Ground collision
+      if (game.playerY > groundY - 30) {
+        game.playerY = groundY - 30;
+        game.playerVelY = 0;
+      }
+      
+      // Check zombie collision
+      for (const zombie of game.zombies) {
+        if (zombie.health <= 0) continue;
+        const dx = game.playerX - zombie.x;
+        const dy = game.playerY - zombie.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 40) {
+          game.health -= 0.3;
+          // Knockback
+          game.playerVelX += (dx / dist) * 2;
+        }
+      }
+      
+      if (game.health <= 0) {
+        gameOver('You were eaten by zombies!');
+      }
+    }
+
+    function updateZombies() {
+      const targetX = game.inTruck ? game.truckX : game.playerX;
+      const targetY = game.inTruck ? game.truckY : game.playerY;
+      
+      for (const zombie of game.zombies) {
+        if (zombie.health <= 0) continue;
+        
+        const dx = targetX - zombie.x;
+        const dy = targetY - zombie.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Chase if close enough
+        if (dist < 400 && !game.inTruck) {
+          zombie.state = 'chase';
+          zombie.velX = (dx / dist) * 1.5;
+        } else {
+          zombie.state = 'idle';
+          zombie.velX *= 0.9;
+        }
+        
+        zombie.x += zombie.velX;
+        
+        // Keep on ground
+        const groundY = getTerrainHeight(zombie.x);
+        zombie.y = groundY - 30;
+        
+        zombie.animFrame = (zombie.animFrame + 0.1) % 4;
+        
+        // Truck collision damages zombie
+        if (game.inTruck) {
+          const truckDist = Math.sqrt((game.truckX - zombie.x) ** 2 + (game.truckY - zombie.y) ** 2);
+          if (truckDist < 60 && Math.abs(game.truckVelX) > 2) {
+            zombie.health -= Math.abs(game.truckVelX) * 5;
+            game.truckHealth -= 2;
+          }
+        }
+      }
+    }
+
+    // Rendering
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Sky gradient
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      skyGradient.addColorStop(0, '#1a0505');
+      skyGradient.addColorStop(0.5, '#2d1a1a');
+      skyGradient.addColorStop(1, '#4a2020');
+      ctx.fillStyle = skyGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Moon
+      ctx.fillStyle = '#ffeecc';
+      ctx.beginPath();
+      ctx.arc(canvas.width - 100, 80, 40, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1a0505';
+      ctx.beginPath();
+      ctx.arc(canvas.width - 85, 75, 35, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Mountains (background)
+      ctx.fillStyle = '#1a0a0a';
+      for (let i = 0; i < 3; i++) {
+        const offset = (game.cameraX * (0.1 + i * 0.05)) % 400;
+        for (let x = -offset; x < canvas.width + 200; x += 200) {
+          ctx.beginPath();
+          ctx.moveTo(x, canvas.height * 0.5);
+          ctx.lineTo(x + 100, canvas.height * 0.3 - i * 30);
+          ctx.lineTo(x + 200, canvas.height * 0.5);
+          ctx.fill();
+        }
+      }
+      
+      ctx.save();
+      ctx.translate(-game.cameraX, 0);
+      
+      // Draw terrain
+      drawTerrain();
+      
+      // Draw locations
+      for (const loc of game.locations) {
+        drawLocation(loc);
+      }
+      
+      // Draw lootables
+      for (const loot of game.lootables) {
+        if (!loot.collected) {
+          drawLootable(loot);
+        }
+      }
+      
+      // Draw zombies
+      for (const zombie of game.zombies) {
+        if (zombie.health > 0) {
+          drawZombie(zombie);
+        }
+      }
+      
+      // Draw truck
+      drawTruck();
+      
+      // Draw player (if outside truck)
+      if (!game.inTruck) {
+        drawPlayer();
+      }
+      
+      ctx.restore();
+    }
+
+    function drawTerrain() {
+      // Ground fill
+      ctx.fillStyle = '#2a1a0a';
+      ctx.beginPath();
+      
+      const startX = Math.floor(game.cameraX / game.terrainSegmentWidth) * game.terrainSegmentWidth - 100;
+      const endX = game.cameraX + canvas.width + 200;
+      
+      ctx.moveTo(startX, canvas.height);
+      
+      for (let x = startX; x <= endX; x += 10) {
+        const y = getTerrainHeight(x);
+        ctx.lineTo(x, y);
+      }
+      
+      ctx.lineTo(endX, canvas.height);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Ground surface
+      ctx.strokeStyle = '#4a3020';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let x = startX; x <= endX; x += 10) {
+        const y = getTerrainHeight(x);
+        if (x === startX) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      // Grass/debris details
+      for (const segment of game.terrain) {
+        if (segment.x < game.cameraX - 100 || segment.x > game.cameraX + canvas.width + 100) continue;
+        
+        // Draw grass tufts
+        for (let i = 0; i < 3; i++) {
+          const gx = segment.x + i * 30 + 10;
+          const gy = getTerrainHeight(gx);
+          ctx.fillStyle = '#3a5a30';
+          ctx.beginPath();
+          ctx.moveTo(gx - 5, gy);
+          ctx.lineTo(gx, gy - 15);
+          ctx.lineTo(gx + 5, gy);
+          ctx.fill();
+        }
+        
+        // Draw debris for debris type
+        if (segment.type === 'debris') {
+          ctx.fillStyle = '#555';
+          ctx.fillRect(segment.x + 20, segment.y - 15, 30, 15);
+          ctx.fillRect(segment.x + 60, segment.y - 10, 20, 10);
+        }
+      }
+    }
+
+    function drawTruck() {
+      ctx.save();
+      ctx.translate(game.truckX, game.truckY);
+      ctx.rotate(game.truckAngle);
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.ellipse(0, 35, 50, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Truck body
+      ctx.fillStyle = '#c44';
+      ctx.beginPath();
+      ctx.roundRect(-45, -30, 90, 35, 5);
+      ctx.fill();
+      
+      // Cabin
+      ctx.fillStyle = '#a33';
+      ctx.beginPath();
+      ctx.roundRect(-40, -50, 40, 25, 3);
+      ctx.fill();
+      
+      // Window
+      ctx.fillStyle = '#6ad';
+      ctx.fillRect(-35, -47, 30, 18);
+      
+      // Cargo area
+      ctx.fillStyle = '#844';
+      ctx.fillRect(5, -45, 35, 20);
+      
+      // Wheels
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(-30, 10, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(30, 10, 18, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Wheel hubs
+      ctx.fillStyle = '#666';
+      ctx.beginPath();
+      ctx.arc(-30, 10, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(30, 10, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Headlights
+      ctx.fillStyle = '#ff8';
+      ctx.beginPath();
+      ctx.arc(45, -15, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Damage indicator
+      if (game.truckHealth < 50) {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(10, -35, 15, 10);
+      }
+      
+      ctx.restore();
+    }
+
+    function drawPlayer() {
+      ctx.save();
+      ctx.translate(game.playerX, game.playerY);
+      ctx.scale(game.playerFacing, 1);
+      
+      // Body
+      ctx.fillStyle = '#4a7';
+      ctx.fillRect(-10, -25, 20, 30);
+      
+      // Head
+      ctx.fillStyle = '#fca';
+      ctx.beginPath();
+      ctx.arc(0, -35, 12, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Legs
+      ctx.fillStyle = '#445';
+      ctx.fillRect(-8, 5, 6, 20);
+      ctx.fillRect(2, 5, 6, 20);
+      
+      // Backpack
+      ctx.fillStyle = '#764';
+      ctx.fillRect(-18, -20, 8, 25);
+      
+      ctx.restore();
+    }
+
+    function drawZombie(zombie) {
+      ctx.save();
+      ctx.translate(zombie.x, zombie.y);
+      
+      const bob = Math.sin(zombie.animFrame) * 3;
+      
+      // Body
+      ctx.fillStyle = '#4a5';
+      ctx.fillRect(-8, -20 + bob, 16, 25);
+      
+      // Head
+      ctx.fillStyle = '#6a7';
+      ctx.beginPath();
+      ctx.arc(0, -28 + bob, 10, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Eyes
+      ctx.fillStyle = '#f00';
+      ctx.beginPath();
+      ctx.arc(-3, -30 + bob, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(3, -30 + bob, 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Arms
+      ctx.fillStyle = '#4a5';
+      const armAngle = Math.sin(zombie.animFrame * 2) * 0.3;
+      ctx.save();
+      ctx.translate(-8, -15 + bob);
+      ctx.rotate(-0.5 + armAngle);
+      ctx.fillRect(0, 0, 20, 5);
+      ctx.restore();
+      
+      ctx.restore();
+    }
+
+    function drawLocation(loc) {
+      ctx.save();
+      ctx.translate(loc.x, loc.y);
+      
+      // Building base
+      let baseColor = '#555';
+      let roofColor = '#333';
+      let label = '';
+      
+      switch (loc.type) {
+        case 'gas_station':
+          baseColor = '#765';
+          roofColor = '#c44';
+          label = '⛽ GAS';
+          break;
+        case 'house':
+          baseColor = '#876';
+          roofColor = '#543';
+          label = '🏠';
+          break;
+        case 'shop':
+          baseColor = '#668';
+          roofColor = '#446';
+          label = '🏪 SHOP';
+          break;
+        case 'military':
+          baseColor = '#565';
+          roofColor = '#343';
+          label = '🎖️ MIL';
+          break;
+        case 'repair_shop':
+          baseColor = '#776';
+          roofColor = '#554';
+          label = '🔧 REPAIR';
+          break;
+      }
+      
+      // Building
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0, 0, loc.width, loc.height);
+      
+      // Roof
+      ctx.fillStyle = roofColor;
+      ctx.beginPath();
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(loc.width / 2, -25);
+      ctx.lineTo(loc.width + 10, 0);
+      ctx.fill();
+      
+      // Door
+      ctx.fillStyle = '#432';
+      ctx.fillRect(loc.width / 2 - 12, loc.height - 40, 24, 40);
+      
+      // Windows
+      ctx.fillStyle = loc.looted ? '#335' : '#5af';
+      ctx.fillRect(15, 15, 20, 20);
+      ctx.fillRect(loc.width - 35, 15, 20, 20);
+      
+      // Label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px Rubik';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, loc.width / 2, -30);
+      
+      ctx.restore();
+    }
+
+    function drawLootable(loot) {
+      ctx.save();
+      ctx.translate(loot.x, loot.y);
+      
+      switch (loot.type) {
+        case 'gas_can':
+          ctx.fillStyle = '#c44';
+          ctx.fillRect(-10, -20, 20, 20);
+          ctx.fillStyle = '#fff';
+          ctx.font = '12px Arial';
+          ctx.fillText('⛽', -6, -5);
+          break;
+        case 'crate':
+          ctx.fillStyle = '#864';
+          ctx.fillRect(-15, -20, 30, 20);
+          ctx.strokeStyle = '#543';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-15, -20, 30, 20);
+          ctx.fillStyle = '#fff';
+          ctx.fillText('📦', -8, -5);
+          break;
+        case 'barrel':
+          ctx.fillStyle = '#456';
+          ctx.beginPath();
+          ctx.ellipse(0, -10, 12, 15, 0, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        case 'chest':
+          ctx.fillStyle = '#a84';
+          ctx.fillRect(-18, -15, 36, 15);
+          ctx.fillStyle = '#fc0';
+          ctx.fillRect(-3, -10, 6, 6);
+          break;
+      }
+      
+      // Sparkle effect
+      const sparkle = Math.sin(Date.now() / 200) * 0.5 + 0.5;
+      ctx.fillStyle = `rgba(255, 255, 0, ${sparkle * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(0, -15, 20, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+
+    // Interaction checking
+    function checkInteractions() {
+      const px = game.inTruck ? game.truckX : game.playerX;
+      const py = game.inTruck ? game.truckY : game.playerY;
+      
+      // Check lootables
+      for (const loot of game.lootables) {
+        if (loot.collected) continue;
+        const dist = Math.sqrt((px - loot.x) ** 2 + (py - loot.y) ** 2);
+        if (dist < 50) {
+          showInteractPrompt('loot');
+          return { type: 'loot', target: loot };
+        }
+      }
+      
+      // Check locations
+      for (const loc of game.locations) {
+        if (loc.looted) continue;
+        if (px > loc.x - 20 && px < loc.x + loc.width + 20 && !game.inTruck) {
+          showInteractPrompt('enter ' + loc.type.replace('_', ' '));
+          return { type: 'location', target: loc };
+        }
+      }
+      
+      // Check truck (when outside)
+      if (!game.inTruck) {
+        const dist = Math.sqrt((px - game.truckX) ** 2 + (py - game.truckY) ** 2);
+        if (dist < 60) {
+          showInteractPrompt('enter truck');
+          return { type: 'truck', target: null };
+        }
+      }
+      
+      hideInteractPrompt();
+      return null;
+    }
+
+    function showInteractPrompt(action) {
+      const prompt = document.getElementById('interactPrompt');
+      const actionText = document.getElementById('interactAction');
+      actionText.textContent = action;
+      prompt.classList.remove('hidden');
+    }
+
+    function hideInteractPrompt() {
+      document.getElementById('interactPrompt').classList.add('hidden');
+    }
+
+    function interact() {
+      const interaction = checkInteractions();
+      if (!interaction) return;
+      
+      switch (interaction.type) {
+        case 'loot':
+          collectLoot(interaction.target);
+          break;
+        case 'location':
+          lootLocation(interaction.target);
+          break;
+        case 'truck':
+          enterTruck();
+          break;
+      }
+    }
+
+    function collectLoot(loot) {
+      loot.collected = true;
+      
+      const items = [];
+      switch (loot.type) {
+        case 'gas_can':
+          game.gasCans += 1;
+          items.push({ icon: '⛽', name: 'Gas Can', amount: 1 });
+          break;
+        case 'crate':
+          const crateItems = Math.floor(Math.random() * 3) + 1;
+          if (Math.random() < 0.5) { game.wood += crateItems; items.push({ icon: '🪵', name: 'Wood', amount: crateItems }); }
+          if (Math.random() < 0.5) { game.metal += crateItems; items.push({ icon: '⚙️', name: 'Metal', amount: crateItems }); }
+          break;
+        case 'barrel':
+          if (Math.random() < 0.7) { game.gasCans += 1; items.push({ icon: '⛽', name: 'Gas Can', amount: 1 }); }
+          break;
+        case 'chest':
+          const coins = Math.floor(Math.random() * 50) + 10;
+          game.coins += coins;
+          items.push({ icon: '💰', name: 'Coins', amount: coins });
+          if (Math.random() < 0.3) { game.vehicleParts += 1; items.push({ icon: '🔧', name: 'Parts', amount: 1 }); }
+          break;
+      }
+      
+      showLootPopup(items);
+    }
+
+    function lootLocation(loc) {
+      loc.looted = true;
+      const items = [];
+      
+      switch (loc.type) {
+        case 'gas_station':
+          game.gasCans += 3;
+          items.push({ icon: '⛽', name: 'Gas Can', amount: 3 });
+          const coins1 = Math.floor(Math.random() * 30) + 10;
+          game.coins += coins1;
+          items.push({ icon: '💰', name: 'Coins', amount: coins1 });
+          break;
+        case 'house':
+          game.food += 2;
+          items.push({ icon: '🍖', name: 'Food', amount: 2 });
+          if (Math.random() < 0.5) { game.wood += 3; items.push({ icon: '🪵', name: 'Wood', amount: 3 }); }
+          break;
+        case 'shop':
+          game.food += 3;
+          items.push({ icon: '🍖', name: 'Food', amount: 3 });
+          const coins2 = Math.floor(Math.random() * 50) + 20;
+          game.coins += coins2;
+          items.push({ icon: '💰', name: 'Coins', amount: coins2 });
+          break;
+        case 'military':
+          game.metal += 5;
+          items.push({ icon: '⚙️', name: 'Metal', amount: 5 });
+          game.vehicleParts += 2;
+          items.push({ icon: '🔧', name: 'Parts', amount: 2 });
+          if (Math.random() < 0.3) { game.gasCans += 2; items.push({ icon: '⛽', name: 'Gas', amount: 2 }); }
+          break;
+        case 'repair_shop':
+          game.vehicleParts += 3;
+          items.push({ icon: '🔧', name: 'Parts', amount: 3 });
+          game.metal += 3;
+          items.push({ icon: '⚙️', name: 'Metal', amount: 3 });
+          break;
+      }
+      
+      showLootPopup(items);
+    }
+
+    function showLootPopup(items) {
+      const popup = document.getElementById('lootPopup');
+      const itemsContainer = document.getElementById('lootItems');
+      
+      itemsContainer.innerHTML = items.map(item => `
+        <div class="bg-gray-700 p-2 rounded text-center min-w-[60px]">
+          <span class="text-2xl">${item.icon}</span>
+          <p class="text-xs text-gray-400">${item.name}</p>
+          <p class="text-white font-bold">+${item.amount}</p>
+        </div>
+      `).join('');
+      
+      popup.classList.remove('hidden');
+    }
+
+    function exitTruck() {
+      if (!game.inTruck) return;
+      game.inTruck = false;
+      game.playerX = game.truckX;
+      game.playerY = game.truckY - 20;
+      game.playerVelX = 0;
+      game.playerVelY = 0;
+    }
+
+    function enterTruck() {
+      game.inTruck = true;
+    }
+
+    // UI Updates
+    function updateUI() {
+      document.getElementById('fuelBar').style.width = Math.max(0, game.fuel) + '%';
+      document.getElementById('healthBar').style.width = Math.max(0, game.health) + '%';
+      document.getElementById('truckHealthBar').style.width = Math.max(0, game.truckHealth) + '%';
+      document.getElementById('distanceDisplay').textContent = game.distance + 'm';
+      document.getElementById('coinsDisplay').textContent = game.coins;
+      
+      // Quick inventory
+      document.getElementById('gasCount').textContent = game.gasCans;
+      document.getElementById('foodCount').textContent = game.food;
+      document.getElementById('woodCount').textContent = game.wood;
+      document.getElementById('stoneCount').textContent = game.stone;
+      document.getElementById('metalCount').textContent = game.metal;
+      document.getElementById('partsCount').textContent = game.vehicleParts;
+      
+      // Zombie warning
+      const nearbyZombie = game.zombies.find(z => {
+        if (z.health <= 0) return false;
+        const targetX = game.inTruck ? game.truckX : game.playerX;
+        return Math.abs(z.x - targetX) < 300 && !game.inTruck;
+      });
+      document.getElementById('zombieWarning').classList.toggle('hidden', !nearbyZombie);
+      
+      // Low fuel warning
+      if (game.fuel < 20) {
+        document.getElementById('fuelBar').parentElement.classList.add('shake');
+      } else {
+        document.getElementById('fuelBar').parentElement.classList.remove('shake');
+      }
+    }
+
+    function updateInventoryModal() {
+      document.getElementById('invGas').textContent = game.gasCans;
+      document.getElementById('invFood').textContent = game.food;
+      document.getElementById('invWood').textContent = game.wood;
+      document.getElementById('invStone').textContent = game.stone;
+      document.getElementById('invMetal').textContent = game.metal;
+      document.getElementById('invParts').textContent = game.vehicleParts;
+      document.getElementById('invCoins').textContent = game.coins;
+      document.getElementById('invCapacity').textContent = 'Lv.' + game.backpackLevel;
+    }
+
+    // Game loop
+    function gameLoop() {
+      if (game.running && !game.paused) {
+        updatePhysics();
+        checkInteractions();
+        render();
+        updateUI();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Game over
+    function gameOver(reason) {
+      game.running = false;
+      document.getElementById('gameUI').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.remove('hidden');
+      document.getElementById('deathReason').textContent = reason;
+      document.getElementById('finalDistance').textContent = game.distance + 'm';
+    }
+
+    // Start new game
+    function startNewGame() {
+      game.running = true;
+      game.paused = false;
+      game.inTruck = true;
+      
+      game.fuel = 100;
+      game.health = 100;
+      game.truckHealth = 100;
+      game.distance = 0;
+      game.coins = 0;
+      
+      game.gasCans = 2;
+      game.food = 3;
+      game.wood = 0;
+      game.stone = 0;
+      game.metal = 0;
+      game.vehicleParts = 0;
+      
+      game.truckX = 200;
+      game.truckY = 300;
+      game.truckVelX = 0;
+      game.truckVelY = 0;
+      game.truckAngle = 0;
+      game.truckAngularVel = 0;
+      
+      game.cameraX = 0;
+      game.terrain = [];
+      game.locations = [];
+      game.lootables = [];
+      game.zombies = [];
+      
+      generateTerrain(0, canvas.width + 500);
+      
+      document.getElementById('mainMenu').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      document.getElementById('gameUI').classList.remove('hidden');
+    }
+
+    function loadGame() {
+      if (savedGames.length === 0) return;
+      
+      const save = savedGames[savedGames.length - 1];
+      
+      game.distance = save.distance || 0;
+      game.fuel = save.fuel || 100;
+      game.health = save.health || 100;
+      game.coins = save.coins || 0;
+      game.food = save.food || 0;
+      game.wood = save.wood || 0;
+      game.stone = save.stone || 0;
+      game.metal = save.metal || 0;
+      game.gasCans = save.gas_cans || 0;
+      game.vehicleParts = save.vehicle_parts || 0;
+      game.backpackLevel = save.backpack_level || 1;
+      game.truckHealth = save.truck_health || 100;
+      game.highestDistance = save.highest_distance || 0;
+      
+      game.truckX = game.distance * 10;
+      game.cameraX = game.truckX - 200;
+      
+      game.running = true;
+      game.paused = false;
+      game.inTruck = true;
+      game.terrain = [];
+      game.locations = [];
+      game.lootables = [];
+      game.zombies = [];
+      
+      generateTerrain(game.cameraX - 200, game.cameraX + canvas.width + 500);
+      
+      document.getElementById('mainMenu').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      document.getElementById('gameUI').classList.remove('hidden');
+    }
+
+    async function saveGame() {
+      if (!window.dataSdk) return;
+      
+      const saveData = {
+        save_id: 'save_' + Date.now(),
+        distance: game.distance,
+        fuel: game.fuel,
+        health: game.health,
+        coins: game.coins,
+        food: game.food,
+        wood: game.wood,
+        stone: game.stone,
+        metal: game.metal,
+        gas_cans: game.gasCans,
+        vehicle_parts: game.vehicleParts,
+        backpack_level: game.backpackLevel,
+        truck_health: game.truckHealth,
+        highest_distance: game.highestDistance,
+        saved_at: new Date().toISOString()
+      };
+      
+      // Check limit
+      if (savedGames.length >= 999) {
+        const oldest = savedGames[0];
+        await window.dataSdk.delete(oldest);
+      }
+      
+      const result = await window.dataSdk.create(saveData);
+      if (result.isOk) {
+        showLootPopup([{ icon: '💾', name: 'Game Saved!', amount: '' }]);
+      }
+    }
+
+    // Event listeners
+    document.addEventListener('keydown', (e) => {
+      game.keys[e.code] = true;
+      
+      if (e.code === 'KeyE' && game.running && !game.paused) {
+        if (game.inTruck) exitTruck();
+      }
+      
+      if (e.code === 'KeyF' && game.running && !game.paused) {
+        interact();
+      }
+      
+      if (e.code === 'Escape' && game.running) {
+        game.paused = !game.paused;
+        document.getElementById('pauseMenu').classList.toggle('hidden', !game.paused);
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      game.keys[e.code] = false;
+    });
+
+    // Button listeners
+    document.getElementById('newGameBtn').addEventListener('click', startNewGame);
+    document.getElementById('continueBtn').addEventListener('click', loadGame);
+    document.getElementById('controlsBtn').addEventListener('click', () => {
+      document.getElementById('controlsModal').classList.remove('hidden');
+    });
+    document.getElementById('closeControls').addEventListener('click', () => {
+      document.getElementById('controlsModal').classList.add('hidden');
+    });
+
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      game.paused = true;
+      document.getElementById('pauseMenu').classList.remove('hidden');
+    });
+
+    document.getElementById('resumeBtn').addEventListener('click', () => {
+      game.paused = false;
+      document.getElementById('pauseMenu').classList.add('hidden');
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', saveGame);
+
+    document.getElementById('quitBtn').addEventListener('click', () => {
+      game.running = false;
+      game.paused = false;
+      document.getElementById('pauseMenu').classList.add('hidden');
+      document.getElementById('gameUI').classList.add('hidden');
+      document.getElementById('mainMenu').classList.remove('hidden');
+    });
+
+    document.getElementById('retryBtn').addEventListener('click', startNewGame);
+    document.getElementById('menuBtn').addEventListener('click', () => {
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      document.getElementById('mainMenu').classList.remove('hidden');
+    });
+
+    document.getElementById('inventoryBtn').addEventListener('click', () => {
+      updateInventoryModal();
+      document.getElementById('inventoryModal').classList.remove('hidden');
+      game.paused = true;
+    });
+
+    document.getElementById('closeInventory').addEventListener('click', () => {
+      document.getElementById('inventoryModal').classList.add('hidden');
+      game.paused = false;
+    });
+
+    document.getElementById('closeLoot').addEventListener('click', () => {
+      document.getElementById('lootPopup').classList.add('hidden');
+    });
+
+    // Inventory actions
+    document.getElementById('useGasBtn').addEventListener('click', () => {
+      if (game.gasCans > 0) {
+        game.gasCans--;
+        game.fuel = Math.min(100, game.fuel + 30);
+        updateInventoryModal();
+      }
+    });
+
+    document.getElementById('useFoodBtn').addEventListener('click', () => {
+      if (game.food > 0) {
+        game.food--;
+        game.health = Math.min(100, game.health + 25);
+        updateInventoryModal();
+      }
+    });
+
+    document.getElementById('repairBtn').addEventListener('click', () => {
+      if (game.vehicleParts >= 2 && game.metal >= 1) {
+        game.vehicleParts -= 2;
+        game.metal -= 1;
+        game.truckHealth = Math.min(100, game.truckHealth + 30);
+        updateInventoryModal();
+      }
+    });
+
+    // Mobile controls
+    const mobileAccel = document.getElementById('mobileAccel');
+    const mobileBrake = document.getElementById('mobileBrake');
+    const mobileLeft = document.getElementById('mobileLeft');
+    const mobileRight = document.getElementById('mobileRight');
+    const mobileExit = document.getElementById('mobileExit');
+    const mobileInteract = document.getElementById('mobileInteract');
+
+    mobileAccel.addEventListener('touchstart', (e) => { e.preventDefault(); game.keys['KeyW'] = true; });
+    mobileAccel.addEventListener('touchend', (e) => { e.preventDefault(); game.keys['KeyW'] = false; });
+    mobileBrake.addEventListener('touchstart', (e) => { e.preventDefault(); game.keys['KeyS'] = true; });
+    mobileBrake.addEventListener('touchend', (e) => { e.preventDefault(); game.keys['KeyS'] = false; });
+    mobileLeft.addEventListener('touchstart', (e) => { e.preventDefault(); game.keys['KeyA'] = true; });
+    mobileLeft.addEventListener('touchend', (e) => { e.preventDefault(); game.keys['KeyA'] = false; });
+    mobileRight.addEventListener('touchstart', (e) => { e.preventDefault(); game.keys['KeyD'] = true; });
+    mobileRight.addEventListener('touchend', (e) => { e.preventDefault(); game.keys['KeyD'] = false; });
+    mobileExit.addEventListener('touchstart', (e) => { e.preventDefault(); if (game.inTruck) exitTruck(); });
+    mobileInteract.addEventListener('touchstart', (e) => { e.preventDefault(); interact(); });
+
+    // Initialize
+    lucide.createIcons();
+    applyConfig();
+    gameLoop();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d8521c2b317d9fb',t:'MTc3MjgzOTY1NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
